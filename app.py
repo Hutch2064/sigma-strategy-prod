@@ -768,10 +768,7 @@ def auth_gate():
     # Recover session from query params
     session_id = st.query_params.get(SESSION_COOKIE)
 
-    login_attempt = (
-        st.session_state.get("login_u") is not None
-        or st.session_state.get("signup_u") is not None
-    )
+    login_attempt = st.session_state.get("auth_in_progress", False)
 
     if session_id and not login_attempt:
         user = get_session_user(session_id)
@@ -791,6 +788,7 @@ def auth_gate():
         login_clicked = st.button("Login")
 
         if login_clicked:
+            st.session_state.auth_in_progress = True
             if not p.strip():
                 st.error("Password is required")
             else:
@@ -805,6 +803,8 @@ def auth_gate():
                     st.query_params[SESSION_COOKIE] = sid
                     st.session_state[SESSION_COOKIE] = sid
                     st.session_state.username = u
+                    st.session_state.auth_in_progress = False
+
                     st.rerun()
                 else:
                     st.error("Invalid username or password")
@@ -816,6 +816,7 @@ def auth_gate():
         signup_clicked = st.button("Create Account")
 
         if signup_clicked:
+            st.session_state.auth_in_progress = True
             if not p.strip():
                 st.error("Password is required")
             else:
@@ -831,6 +832,7 @@ def auth_gate():
                     st.query_params[SESSION_COOKIE] = sid
                     st.session_state[SESSION_COOKIE] = sid
                     st.session_state.username = u
+                    st.session_state.auth_in_progress = False
                     st.rerun()
 
                 except sqlite3.IntegrityError:
