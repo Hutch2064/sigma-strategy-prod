@@ -5,12 +5,11 @@ import matplotlib.pyplot as plt
 import streamlit as st
 import datetime
 from scipy.optimize import minimize
-import yaml
-from yaml.loader import SafeLoader
-import streamlit_authenticator as stauth
 import json
 import os
 import bcrypt
+import secrets
+import hashlib
 
 # ============================================================
 # PERSISTENT STORAGE ROOT (FLY.IO)
@@ -20,6 +19,31 @@ DB_DIR = "/data"
 os.makedirs(DB_DIR, exist_ok=True)
 
 SQLITE_PATH = os.path.join(DB_DIR, "app.db")
+
+import sqlite3
+
+def get_db():
+    return sqlite3.connect(SQLITE_PATH, check_same_thread=False)
+
+def init_db():
+    with get_db() as conn:
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            username TEXT PRIMARY KEY,
+            password_hash TEXT NOT NULL,
+            tier TEXT NOT NULL DEFAULT 'free',
+            created_at TEXT NOT NULL
+        )
+        """)
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS sessions (
+            session_id TEXT PRIMARY KEY,
+            username TEXT NOT NULL,
+            expires_at TEXT NOT NULL
+        )
+        """)
+       
+init_db()
 
 USER_DATA_DIR = os.path.join(DB_DIR, "user_data")
 os.makedirs(USER_DATA_DIR, exist_ok=True)
@@ -53,33 +77,51 @@ def load_user_prefs(username):
             return json.load(f)
     return DEFAULT_PREFS.copy()
 
-# ============================================================
-# SESSION STATE INITIALIZATION (AFTER FUNCTIONS EXIST)
-# ============================================================
+def hash_password(password: str) -> str:
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 
-if "username" not in st.session_state:
-    st.session_state.username = "test_user"
+def verify_password(password: str, password_hash: str) -> bool:
+    return bcrypt.checkpw(password.encode(), password_hash.encode())
 
-if "name" not in st.session_state:
-    st.session_state.name = "Test User"
+SESSION_COOKIE = "sigma_session"
+SESSION_DURATION_HOURS = 24
+def create_session(username: str) -> str:
+    session_id = secrets.token_hex(32)
+    expires_at = (
+        datetime.datetime.utcnow()
+        + datetime.timedelta(hours=SESSION_DURATION_HOURS)
+    ).isoformat()
 
-if "prefs" not in st.session_state:
-    st.session_state.prefs = load_user_prefs(st.session_state.username)
+    with get_db() as conn:
+        conn.execute(
+            "INSERT INTO sessions VALUES (?, ?, ?)",
+            (session_id, username, expires_at)
+        )
 
+    return session_id
 
-def save_user_prefs(username, prefs):
-    with open(_user_file(username), "w") as f:
-        json.dump(prefs, f, indent=2)
+def create_session(username: str) -> str:
+    session_id = secrets.token_hex(32)
+    expires_at = (
+        datetime.datetime.utcnow()
+        + datetime.timedelta(hours=SESSION_DURATION_HOURS)
+    ).isoformat()
 
-if "prefs" not in st.session_state:
-    st.session_state.prefs = load_user_prefs(st.session_state.username)
+    with get_db() as conn:
+        conn.execute(
+            "INSERT INTO sessions VALUES (?, ?, ?)",
+            (session_id, username, expires_at)
+        )
+
+    return session_id
    
-# ============================================================
-# TEMPORARY FIXED USER (AUTH DISABLED)
-# ============================================================
+def get_cookie(name):
+    return st.experimental_get_query_params().get(name, [None])[0]
 
-st.session_state.username = "test_user"
-st.session_state.name = "Test User"
+def set_cookie(name, value):
+    st.experimental_set_query_params(**{name: value})
+
+
 
 # ============================================================
 # YOUR STRATEGY FUNCTIONS
@@ -696,13 +738,66 @@ def plot_monte_carlo_results(results_dict, strategy_names):
     plt.tight_layout()
     return fig
 
+def auth_gate():
+    st.title("Sigma Strategy — Sign In")
+
+    session_id = get_cookie(SESSION_COOKIE)
+    if session_id:
+        user = get_session_user(session_id)
+        if user:
+            st.session_state.username = user
+            if "prefs" not in st.session_state:
+                st.session_state.prefs = load_user_prefs(user)
+            return True
+
+    tab_login, tab_signup = st.tabs(["Login", "Sign Up"])
+
+    with tab_login:
+        u = st.text_input("Username", key="login_u")
+        p = st.text_input("Password", type="password", key="login_p")
+        if st.button("Login"):
+            with get_db() as conn:
+                row = conn.execute(
+                    "SELECT password_hash FROM users WHERE username = ?",
+                    (u,)
+                ).fetchone()
+
+            if row and verify_password(p, row[0]):
+                sid = create_session(u)
+                set_cookie(SESSION_COOKIE, sid)
+                st.experimental_rerun()
+            else:
+                st.error("Invalid username or password")
+
+    with tab_signup:
+        u = st.text_input("Username", key="signup_u")
+        p = st.text_input("Password", type="password", key="signup_p")
+        if st.button("Create Account"):
+            try:
+                with get_db() as conn:
+                    conn.execute(
+                        "INSERT INTO users VALUES (?, ?, ?, ?)",
+                        (u, hash_password(p), "free",
+                         datetime.datetime.utcnow().isoformat())
+                    )
+                sid = create_session(u)
+                set_cookie(SESSION_COOKIE, sid)
+                st.experimental_rerun()
+            except sqlite3.IntegrityError:
+                st.error("Username already exists")
+
+    return False
+
+
 # ============================================================
 # STREAMLIT APP
 # ============================================================
 
 def main():
     st.set_page_config(page_title="Portfolio MA Regime Strategy", layout="wide")
-    
+    if not auth_gate():
+        return
+
     # Get user info from session state
     name = st.session_state.get('name', 'User')
     username = st.session_state.get('username', 'user')
@@ -718,6 +813,8 @@ def main():
     st.sidebar.header("Strategy Settings")
     
     # Load saved prefs
+    if "prefs" not in st.session_state:
+       st.session_state.prefs = load_user_prefs(st.session_state.username)
     prefs = st.session_state.prefs
     
     # Input fields with saved values
