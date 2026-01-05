@@ -790,12 +790,26 @@ def auth_gate():
         u = st.text_input("Username", key="login_u")
         p = st.text_input("Password", type="password", key="login_p")
 
-        if st.button("Login"):
+        login_clicked = st.button("Login")
 
-            # 🔒 Enforce password presence
-            if not p:
+        if login_clicked:
+            if not p.strip():
                 st.error("Password is required")
-                st.stop()
+            else:
+                with get_db() as conn:
+                    row = conn.execute(
+                        "SELECT password_hash FROM users WHERE username = ?",
+                        (u,)
+                    ).fetchone()
+
+                if row and verify_password(p, row[0]):
+                    sid = create_session(u)
+                    st.query_params[SESSION_COOKIE] = sid
+                    st.session_state[SESSION_COOKIE] = sid
+                    st.session_state.username = u
+                    st.rerun()
+                else:
+                    st.error("Invalid username or password")
 
             with get_db() as conn:
                 row = conn.execute(
@@ -817,12 +831,28 @@ def auth_gate():
         u = st.text_input("Username", key="signup_u")
         p = st.text_input("Password", type="password", key="signup_p")
 
-        if st.button("Create Account"):
+        signup_clicked = st.button("Create Account")
 
-            # 🔒 Enforce password presence
-            if not p:
+        if signup_clicked:
+            if not p.strip():
                 st.error("Password is required")
-                st.stop()
+            else:
+                try:
+                    with get_db() as conn:
+                        conn.execute(
+                            "INSERT INTO users VALUES (?, ?, ?, ?)",
+                            (u, hash_password(p), "free",
+                             datetime.datetime.utcnow().isoformat())
+                        )
+
+                    sid = create_session(u)
+                    st.query_params[SESSION_COOKIE] = sid
+                    st.session_state[SESSION_COOKIE] = sid
+                    st.session_state.username = u
+                    st.rerun()
+
+                except sqlite3.IntegrityError:
+                    st.error("Username already exists")
 
             try:
                 with get_db() as conn:
