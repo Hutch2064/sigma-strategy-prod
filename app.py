@@ -76,6 +76,11 @@ def load_user_prefs(username):
         with open(path, "r") as f:
             return json.load(f)
     return DEFAULT_PREFS.copy()
+    
+def save_user_prefs(username, prefs: dict):
+    path = _user_file(username)
+    with open(path, "w") as f:
+        json.dump(prefs, f, indent=2)
 
 def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
