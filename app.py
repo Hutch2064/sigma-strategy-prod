@@ -1227,7 +1227,7 @@ def main():
         for name, data in strategies_mc.items():
             if len(data["returns"]) > 100:
                 mc_results[name] = monte_carlo_strategy_analysis(
-                    data["returns"], data["equity"], n_sim=100000, periods=252, initial_capital=data["initial_capital"]
+                    data["returns"], data["equity"], n_sim=1000, periods=252, initial_capital=data["initial_capital"]
                 )
             else:
                 mc_results[name] = None
