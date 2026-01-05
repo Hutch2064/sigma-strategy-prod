@@ -53,6 +53,20 @@ def load_user_prefs(username):
             return json.load(f)
     return DEFAULT_PREFS.copy()
 
+# ============================================================
+# SESSION STATE INITIALIZATION (AFTER FUNCTIONS EXIST)
+# ============================================================
+
+if "username" not in st.session_state:
+    st.session_state.username = "test_user"
+
+if "name" not in st.session_state:
+    st.session_state.name = "Test User"
+
+if "prefs" not in st.session_state:
+    st.session_state.prefs = load_user_prefs(st.session_state.username)
+
+
 def save_user_prefs(username, prefs):
     with open(_user_file(username), "w") as f:
         json.dump(prefs, f, indent=2)
