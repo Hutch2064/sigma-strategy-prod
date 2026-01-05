@@ -768,7 +768,13 @@ def auth_gate():
     # 1. Try to recover session from query params (PERSISTENT)
     session_id = st.query_params.get(SESSION_COOKIE)
 
-    if session_id:
+    # Auto-login ONLY if no login attempt is in progress
+    login_attempt = (
+        st.session_state.get("login_u") is not None
+        or st.session_state.get("signup_u") is not None
+    )
+
+    if session_id and not login_attempt:
         user = get_session_user(session_id)
         if user:
             st.session_state[SESSION_COOKIE] = session_id
@@ -785,6 +791,12 @@ def auth_gate():
         p = st.text_input("Password", type="password", key="login_p")
 
         if st.button("Login"):
+
+            # 🔒 Enforce password presence
+            if not p:
+                st.error("Password is required")
+                st.stop()
+
             with get_db() as conn:
                 row = conn.execute(
                     "SELECT password_hash FROM users WHERE username = ?",
@@ -800,11 +812,18 @@ def auth_gate():
             else:
                 st.error("Invalid username or password")
 
+
     with tab_signup:
         u = st.text_input("Username", key="signup_u")
         p = st.text_input("Password", type="password", key="signup_p")
 
         if st.button("Create Account"):
+
+            # 🔒 Enforce password presence
+            if not p:
+                st.error("Password is required")
+                st.stop()
+
             try:
                 with get_db() as conn:
                     conn.execute(
@@ -822,7 +841,6 @@ def auth_gate():
             except sqlite3.IntegrityError:
                 st.error("Username already exists")
 
-    return False
 
 
 
