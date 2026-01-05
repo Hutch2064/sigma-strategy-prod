@@ -765,12 +765,8 @@ def plot_monte_carlo_results(results_dict, strategy_names):
 def auth_gate():
     st.title("Sigma Strategy — Sign In")
 
-   if user:
-        st.session_state[SESSION_COOKIE] = session_id
-        st.session_state.username = user
-        if "prefs" not in st.session_state:
-            st.session_state.prefs = load_user_prefs(user)
-        return True
+    # 1. Try to recover session from query params (PERSISTENT)
+    session_id = st.query_params.get(SESSION_COOKIE)
 
     if session_id:
         user = get_session_user(session_id)
@@ -781,12 +777,13 @@ def auth_gate():
                 st.session_state.prefs = load_user_prefs(user)
             return True
 
-
+    # 2. Login / Signup UI
     tab_login, tab_signup = st.tabs(["Login", "Sign Up"])
 
     with tab_login:
         u = st.text_input("Username", key="login_u")
         p = st.text_input("Password", type="password", key="login_p")
+
         if st.button("Login"):
             with get_db() as conn:
                 row = conn.execute(
@@ -796,8 +793,9 @@ def auth_gate():
 
             if row and verify_password(p, row[0]):
                 sid = create_session(u)
+                st.query_params[SESSION_COOKIE] = sid
                 st.session_state[SESSION_COOKIE] = sid
-                set_cookie(SESSION_COOKIE, sid)
+                st.session_state.username = u
                 st.rerun()
             else:
                 st.error("Invalid username or password")
@@ -805,6 +803,7 @@ def auth_gate():
     with tab_signup:
         u = st.text_input("Username", key="signup_u")
         p = st.text_input("Password", type="password", key="signup_p")
+
         if st.button("Create Account"):
             try:
                 with get_db() as conn:
@@ -813,14 +812,18 @@ def auth_gate():
                         (u, hash_password(p), "free",
                          datetime.datetime.utcnow().isoformat())
                     )
+
                 sid = create_session(u)
+                st.query_params[SESSION_COOKIE] = sid
                 st.session_state[SESSION_COOKIE] = sid
-                set_cookie(SESSION_COOKIE, sid)
+                st.session_state.username = u
                 st.rerun()
+
             except sqlite3.IntegrityError:
                 st.error("Username already exists")
 
     return False
+
 
 
 # ============================================================
