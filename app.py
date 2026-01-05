@@ -834,7 +834,22 @@ def main():
     st.set_page_config(page_title="Portfolio MA Regime Strategy", layout="wide")
     if not auth_gate():
         return
+    # ----------------------------
+    # Logout (production-safe)
+    # ----------------------------
+    if st.sidebar.button("🚪 Logout"):
+        sid = st.query_params.get(SESSION_COOKIE)
+        if sid:
+            with get_db() as conn:
+                conn.execute(
+                    "DELETE FROM sessions WHERE session_id = ?",
+                    (sid,)
+                )
 
+        st.query_params.clear()
+        st.session_state.clear()
+        st.rerun()
+        
     # Get user info from session state
     name = st.session_state.get('name', 'User')
     username = st.session_state.get('username', 'user')
