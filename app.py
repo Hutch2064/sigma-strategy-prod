@@ -114,12 +114,27 @@ def create_session(username: str) -> str:
         )
 
     return session_id
-   
+
+def get_session_user(session_id: str):
+    now = datetime.datetime.utcnow().isoformat()
+    with get_db() as conn:
+        row = conn.execute(
+            """
+            SELECT username FROM sessions
+            WHERE session_id = ?
+            AND expires_at > ?
+            """,
+            (session_id, now)
+        ).fetchone()
+
+    return row[0] if row else None
+
 def get_cookie(name):
-    return st.query_params.get(name, [None])[0]
+    return st.query_params.get(name)
 
 def set_cookie(name, value):
-    st.experimental_set_query_params(**{name: value})
+    st.query_params[name] = value
+
 
 
 
@@ -765,7 +780,7 @@ def auth_gate():
             if row and verify_password(p, row[0]):
                 sid = create_session(u)
                 set_cookie(SESSION_COOKIE, sid)
-                st.experimental_rerun()
+                st.rerun()
             else:
                 st.error("Invalid username or password")
 
@@ -782,7 +797,7 @@ def auth_gate():
                     )
                 sid = create_session(u)
                 set_cookie(SESSION_COOKIE, sid)
-                st.experimental_rerun()
+                st.rerun()
             except sqlite3.IntegrityError:
                 st.error("Username already exists")
 
