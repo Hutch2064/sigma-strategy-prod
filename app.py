@@ -10,6 +10,9 @@ import os
 import bcrypt
 import secrets
 import hashlib
+import streamlit.components.v1 as components
+
+
 
 # ============================================================
 # PERSISTENT STORAGE ROOT (FLY.IO)
@@ -147,19 +150,6 @@ def set_cookie(name, value, days=1):
     )
 
 def get_cookie(name):
-    components.html(
-        """
-        <script>
-        const cookies = document.cookie.split(';').reduce((acc, c) => {
-            const [k, v] = c.trim().split('=');
-            acc[k] = v;
-            return acc;
-        }, {});
-        window.parent.postMessage(cookies, "*");
-        </script>
-        """,
-        height=0
-    )
     return st.session_state.get(name)
 
 
