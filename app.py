@@ -134,11 +134,34 @@ def get_session_user(session_id: str):
 
     return row[0] if row else None
 
-def get_cookie(name):
-    return st.query_params.get(name)
+def set_cookie(name, value, days=1):
+    components.html(
+        f"""
+        <script>
+        const d = new Date();
+        d.setTime(d.getTime() + ({days}*24*60*60*1000));
+        document.cookie = "{name}={value};expires=" + d.toUTCString() + ";path=/";
+        </script>
+        """,
+        height=0
+    )
 
-def set_cookie(name, value):
-    st.query_params[name] = value
+def get_cookie(name):
+    components.html(
+        """
+        <script>
+        const cookies = document.cookie.split(';').reduce((acc, c) => {
+            const [k, v] = c.trim().split('=');
+            acc[k] = v;
+            return acc;
+        }, {});
+        window.parent.postMessage(cookies, "*");
+        </script>
+        """,
+        height=0
+    )
+    return st.session_state.get(name)
+
 
 
 
@@ -761,14 +784,20 @@ def plot_monte_carlo_results(results_dict, strategy_names):
 def auth_gate():
     st.title("Sigma Strategy — Sign In")
 
-    session_id = get_cookie(SESSION_COOKIE)
+    session_id = st.session_state.get(SESSION_COOKIE)
+
+    if not session_id:
+        session_id = get_cookie(SESSION_COOKIE)
+
     if session_id:
         user = get_session_user(session_id)
         if user:
+            st.session_state[SESSION_COOKIE] = session_id
             st.session_state.username = user
             if "prefs" not in st.session_state:
                 st.session_state.prefs = load_user_prefs(user)
             return True
+
 
     tab_login, tab_signup = st.tabs(["Login", "Sign Up"])
 
@@ -784,6 +813,7 @@ def auth_gate():
 
             if row and verify_password(p, row[0]):
                 sid = create_session(u)
+                st.session_state[SESSION_COOKIE] = sid
                 set_cookie(SESSION_COOKIE, sid)
                 st.rerun()
             else:
@@ -801,6 +831,7 @@ def auth_gate():
                          datetime.datetime.utcnow().isoformat())
                     )
                 sid = create_session(u)
+                st.session_state[SESSION_COOKIE] = sid
                 set_cookie(SESSION_COOKIE, sid)
                 st.rerun()
             except sqlite3.IntegrityError:
