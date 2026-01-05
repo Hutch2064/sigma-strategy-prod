@@ -1,10 +1,10 @@
-# fly.toml app configuration file generated for sigma-strategy-prod on 2026-01-05T02:15:08Z
+# fly.toml app configuration file generated for sigma-strategy-prod on 2026-01-05T03:26:00Z
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
 app = 'sigma-strategy-prod'
-primary_region = 'lax'
+primary_region = 'iad'
 
 [build]
 
