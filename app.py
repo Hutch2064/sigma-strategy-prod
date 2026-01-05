@@ -116,7 +116,7 @@ def create_session(username: str) -> str:
     return session_id
    
 def get_cookie(name):
-    return st.experimental_get_query_params().get(name, [None])[0]
+    return st.query_params.get(name, [None])[0]
 
 def set_cookie(name, value):
     st.experimental_set_query_params(**{name: value})
