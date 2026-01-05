@@ -786,7 +786,7 @@ def auth_gate():
     # 2. Login / Signup UI
     tab_login, tab_signup = st.tabs(["Login", "Sign Up"])
 
-    with tab_login:
+   with tab_login:
         u = st.text_input("Username", key="login_u")
         p = st.text_input("Password", type="password", key="login_p")
 
@@ -810,22 +810,6 @@ def auth_gate():
                     st.rerun()
                 else:
                     st.error("Invalid username or password")
-
-            with get_db() as conn:
-                row = conn.execute(
-                    "SELECT password_hash FROM users WHERE username = ?",
-                    (u,)
-                ).fetchone()
-
-            if row and verify_password(p, row[0]):
-                sid = create_session(u)
-                st.query_params[SESSION_COOKIE] = sid
-                st.session_state[SESSION_COOKIE] = sid
-                st.session_state.username = u
-                st.rerun()
-            else:
-                st.error("Invalid username or password")
-
 
     with tab_signup:
         u = st.text_input("Username", key="signup_u")
@@ -853,6 +837,7 @@ def auth_gate():
 
                 except sqlite3.IntegrityError:
                     st.error("Username already exists")
+
 
             try:
                 with get_db() as conn:
