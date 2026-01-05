@@ -765,10 +765,9 @@ def plot_monte_carlo_results(results_dict, strategy_names):
 def auth_gate():
     st.title("Sigma Strategy — Sign In")
 
-    # 1. Try to recover session from query params (PERSISTENT)
+    # Recover session from query params
     session_id = st.query_params.get(SESSION_COOKIE)
 
-    # Auto-login ONLY if no login attempt is in progress
     login_attempt = (
         st.session_state.get("login_u") is not None
         or st.session_state.get("signup_u") is not None
@@ -783,10 +782,9 @@ def auth_gate():
                 st.session_state.prefs = load_user_prefs(user)
             return True
 
-    # 2. Login / Signup UI
     tab_login, tab_signup = st.tabs(["Login", "Sign Up"])
 
-   with tab_login:
+    with tab_login:
         u = st.text_input("Username", key="login_u")
         p = st.text_input("Password", type="password", key="login_p")
 
@@ -838,23 +836,8 @@ def auth_gate():
                 except sqlite3.IntegrityError:
                     st.error("Username already exists")
 
+    return False
 
-            try:
-                with get_db() as conn:
-                    conn.execute(
-                        "INSERT INTO users VALUES (?, ?, ?, ?)",
-                        (u, hash_password(p), "free",
-                         datetime.datetime.utcnow().isoformat())
-                    )
-
-                sid = create_session(u)
-                st.query_params[SESSION_COOKIE] = sid
-                st.session_state[SESSION_COOKIE] = sid
-                st.session_state.username = u
-                st.rerun()
-
-            except sqlite3.IntegrityError:
-                st.error("Username already exists")
 
 
 
